@@ -12,20 +12,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Types for our database
-export type ListingType = 'sale' | 'rent'
-export type RentalPeriod = 'day' | 'week' | 'month'
+// Types for Craigslist-style marketplace
+export type ListingType = 'for-sale' | 'service' | 'housing' | 'request'
+export type ListingCategory = 'for-sale' | 'service' | 'housing' | 'request'
 
 export interface Listing {
   id: string
   title: string
   description: string
-  price: number
+  price: number | null // null for "free" or "negotiable"
   type: ListingType
-  rental_period?: RentalPeriod
+  category: ListingCategory
+  subcategory?: string
   images: string[]
   seller_id: string
-  business_id?: string
+  seller_name: string
+  whatsapp?: string
+  telegram?: string
+  available: boolean
+  views: number
+  business_id?: string // Keep for now, will remove later
   created_at: string
   updated_at: string
 }
@@ -33,12 +39,15 @@ export interface Listing {
 export interface CreateListingInput {
   title: string
   description: string
-  price: number
+  price: number | null
   type: ListingType
-  rental_period?: RentalPeriod
+  category: ListingCategory
+  subcategory?: string
   images: string[]
-  seller_id?: string // Optional for now, will be required with auth
-  business_id?: string // Optional: link listing to a business
+  seller_name: string
+  whatsapp?: string
+  telegram?: string
+  seller_id?: string
 }
 
 export interface Business {
