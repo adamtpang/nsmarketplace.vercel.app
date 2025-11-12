@@ -1,16 +1,30 @@
 "use client"
 
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { SiteHeaderSimple } from "@/components/site-header-simple"
 import { supabase, type Listing } from "@/lib/supabase"
 import { useEffect, useState } from "react"
 
+// Category emoji mapping
+const categoryEmojis: Record<string, string> = {
+  'electronics': '🖥️',
+  'furniture': '🪑',
+  'sports': '🚲',
+  'clothing': '👕',
+  'personal': '💆',
+  'professional': '💻',
+  'health': '💊',
+  'creative': '🎨',
+  'default': '📦'
+}
+
 export default function HomePage() {
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     async function fetchListings() {
@@ -18,13 +32,12 @@ export default function HomePage() {
         const { data, error } = await supabase
           .from('listings')
           .select('*')
+          .eq('available', true)
           .order('created_at', { ascending: false })
 
         if (error) {
           console.error('Error fetching listings:', error)
-          console.error('Error details:', JSON.stringify(error, null, 2))
         } else {
-          console.log('Fetched listings:', data)
           setListings(data || [])
         }
       } catch (err) {
@@ -37,93 +50,201 @@ export default function HomePage() {
     fetchListings()
   }, [])
 
+  // Group listings by category
+  const forSale = listings.filter(l => l.category === 'for-sale')
+  const services = listings.filter(l => l.category === 'service')
+  const housing = listings.filter(l => l.category === 'housing')
+  const requests = listings.filter(l => l.category === 'request')
+
+  // Filter by search
+  const filterBySearch = (items: Listing[]) => {
+    if (!searchQuery) return items
+    const query = searchQuery.toLowerCase()
+    return items.filter(item =>
+      item.title.toLowerCase().includes(query) ||
+      item.description.toLowerCase().includes(query)
+    )
+  }
+
+  const getEmoji = (listing: Listing) => {
+    return categoryEmojis[listing.subcategory || ''] || categoryEmojis['default']
+  }
+
+  const formatPrice = (price: number | null) => {
+    if (price === null || price === 0) return 'Free'
+    return `$${price}`
+  }
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <SiteHeaderSimple />
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 lg:px-8 max-w-7xl py-8">
-        {/* Hero Section */}
-        <section className="mb-12">
-          <h1 className="text-4xl font-bold mb-3">Welcome to NS Market</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl">
-            Buy, sell, and rent within the Network School community
-          </p>
-        </section>
+      <main className="container mx-auto px-4 lg:px-8 max-w-5xl py-6">
+        {/* Search Bar */}
+        <div className="mb-8 flex gap-3 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search listings..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button asChild size="lg">
+            <Link href="/seller/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Post Listing
+            </Link>
+          </Button>
+        </div>
 
-        {/* Listings or Empty State */}
-        <section>
-          {loading ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Loading listings...</p>
-            </div>
-          ) : listings.length === 0 ? (
-            <Card className="shadow-card">
-              <CardContent className="p-12 text-center">
-                <div className="max-w-md mx-auto space-y-4">
-                  <div className="text-6xl mb-4">📦</div>
-                  <h2 className="text-2xl font-bold">No listings yet</h2>
-                  <p className="text-muted-foreground">
-                    Be the first to list an item in the NS Market!
-                  </p>
-                  <Button size="lg" asChild className="mt-4">
-                    <Link href="/seller/new">
-                      <Plus className="mr-2 h-5 w-5" />
-                      Create First Listing
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading listings...</p>
+          </div>
+        ) : listings.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed rounded-lg">
+            <div className="text-6xl mb-4">📦</div>
+            <h2 className="text-2xl font-bold mb-2">No listings yet</h2>
+            <p className="text-muted-foreground mb-6">
+              Be the first to post in floatlist!
+            </p>
+            <Button size="lg" asChild>
+              <Link href="/seller/new">
+                <Plus className="mr-2 h-5 w-5" />
+                Create First Listing
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* For Sale Section */}
+            {filterBySearch(forSale).length > 0 && (
+              <section>
+                <h2 className="text-xl font-bold mb-4 pb-2 border-b-2 border-foreground">
+                  For Sale
+                </h2>
+                <div className="space-y-2">
+                  {filterBySearch(forSale).map((listing) => (
+                    <Link
+                      key={listing.id}
+                      href={`/listing/${listing.id}`}
+                      className="block hover:bg-muted/50 transition-colors rounded-lg p-3 border border-transparent hover:border-border"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl flex-shrink-0">{getEmoji(listing)}</span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-base truncate">{listing.title}</h3>
+                          <p className="text-sm text-muted-foreground truncate">{listing.description}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-semibold text-lg text-primary">{formatPrice(listing.price)}</div>
+                          <div className="text-xs text-muted-foreground">📍 KL</div>
+                        </div>
+                        <Button size="sm" variant="outline">Contact</Button>
+                      </div>
                     </Link>
-                  </Button>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {listings.map((listing) => (
-                <Link href={`/listing/${listing.id}`} key={listing.id}>
-                  <Card className="shadow-card hover:shadow-card-hover transition-smooth cursor-pointer overflow-hidden">
-                    {listing.images && listing.images.length > 0 ? (
-                      <div className="aspect-[4/3] relative overflow-hidden bg-muted">
-                        <img
-                          src={listing.images[0]}
-                          alt={listing.title}
-                          className="object-cover w-full h-full hover:scale-105 transition-smooth"
-                        />
+              </section>
+            )}
+
+            {/* Services Section */}
+            {filterBySearch(services).length > 0 && (
+              <section>
+                <h2 className="text-xl font-bold mb-4 pb-2 border-b-2 border-foreground">
+                  Services
+                </h2>
+                <div className="space-y-2">
+                  {filterBySearch(services).map((listing) => (
+                    <Link
+                      key={listing.id}
+                      href={`/listing/${listing.id}`}
+                      className="block hover:bg-muted/50 transition-colors rounded-lg p-3 border border-transparent hover:border-border"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl flex-shrink-0">{getEmoji(listing)}</span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-base truncate">{listing.title}</h3>
+                          <p className="text-sm text-muted-foreground truncate">{listing.description}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-semibold text-lg text-primary">{formatPrice(listing.price)}</div>
+                          <div className="text-xs text-muted-foreground">📍 KL</div>
+                        </div>
+                        <Button size="sm" variant="outline">Contact</Button>
                       </div>
-                    ) : (
-                      <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-                        <span className="text-6xl">📦</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Housing Section */}
+            {filterBySearch(housing).length > 0 && (
+              <section>
+                <h2 className="text-xl font-bold mb-4 pb-2 border-b-2 border-foreground">
+                  Housing
+                </h2>
+                <div className="space-y-2">
+                  {filterBySearch(housing).map((listing) => (
+                    <Link
+                      key={listing.id}
+                      href={`/listing/${listing.id}`}
+                      className="block hover:bg-muted/50 transition-colors rounded-lg p-3 border border-transparent hover:border-border"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl flex-shrink-0">🏠</span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-base truncate">{listing.title}</h3>
+                          <p className="text-sm text-muted-foreground truncate">{listing.description}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-semibold text-lg text-primary">{formatPrice(listing.price)}</div>
+                          <div className="text-xs text-muted-foreground">📍 KL</div>
+                        </div>
+                        <Button size="sm" variant="outline">Contact</Button>
                       </div>
-                    )}
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg mb-2 line-clamp-1">
-                        {listing.title}
-                      </h3>
-                      <p className="text-2xl font-bold text-primary mb-2">
-                        ${listing.price.toFixed(2)}
-                        {listing.type === 'rent' && listing.rental_period && (
-                          <span className="text-sm text-muted-foreground font-normal">
-                            /{listing.rental_period}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {listing.description}
-                      </p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          listing.type === 'sale'
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-accent/10 text-accent'
-                        }`}>
-                          {listing.type === 'sale' ? 'For Sale' : 'For Rent'}
-                        </span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Requests Section */}
+            {filterBySearch(requests).length > 0 && (
+              <section>
+                <h2 className="text-xl font-bold mb-4 pb-2 border-b-2 border-foreground">
+                  Requests
+                </h2>
+                <div className="space-y-2">
+                  {filterBySearch(requests).map((listing) => (
+                    <Link
+                      key={listing.id}
+                      href={`/listing/${listing.id}`}
+                      className="block hover:bg-muted/50 transition-colors rounded-lg p-3 border border-transparent hover:border-border"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-2xl flex-shrink-0">💬</span>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-base truncate">"{listing.title}"</h3>
+                          <p className="text-sm text-muted-foreground truncate">{listing.description}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-semibold text-lg text-primary">{formatPrice(listing.price)}</div>
+                          <div className="text-xs text-muted-foreground">📍 KL</div>
+                        </div>
+                        <Button size="sm" variant="outline">Reply</Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
       </main>
     </div>
   )
